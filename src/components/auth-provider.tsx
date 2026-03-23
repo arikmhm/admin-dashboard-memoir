@@ -47,7 +47,6 @@ function decodeTokenPayload(token: string): AuthUser | null {
       id: payload.id ?? payload.sub,
       email: payload.email ?? "",
       role: payload.role,
-      name: payload.name ?? undefined,
     };
   } catch {
     return null;

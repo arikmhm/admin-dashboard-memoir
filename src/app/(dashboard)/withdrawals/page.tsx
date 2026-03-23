@@ -91,11 +91,11 @@ function ApproveDialog({
     try {
       await approve.mutateAsync(withdrawal.id);
       toast.success("Withdrawal berhasil di-approve", {
-        description: `${formatRupiah(withdrawal.amount)} untuk ${withdrawal.owner?.email ?? withdrawal.bankAccountName}`,
+        description: `${formatRupiah(withdrawal.amount)} untuk ${withdrawal.bankAccountName}`,
       });
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 422) {
+      if (err instanceof ApiError && err.status === 400) {
         toast.error("Saldo owner tidak mencukupi", {
           description: "Saldo owner tidak mencukupi untuk withdrawal ini.",
         });
@@ -121,7 +121,7 @@ function ApproveDialog({
                 </span>{" "}
                 untuk{" "}
                 <span className="font-semibold text-zinc-700">
-                  {withdrawal.owner?.email ?? withdrawal.bankAccountName}
+                  {withdrawal.bankAccountName}
                 </span>
                 ?
               </>
@@ -149,14 +149,6 @@ function ApproveDialog({
                 {withdrawal.bankAccountName}
               </span>
             </div>
-            {withdrawal.owner?.walletBalance !== undefined && (
-              <div className="flex justify-between pt-1.5 border-t border-zinc-200">
-                <span className="text-zinc-500">Saldo Owner</span>
-                <span className="text-zinc-700 font-medium tabular-nums">
-                  {formatRupiah(withdrawal.owner.walletBalance)}
-                </span>
-              </div>
-            )}
           </div>
         )}
 
@@ -258,7 +250,7 @@ function RejectDialog({
                 </span>{" "}
                 dari{" "}
                 <span className="font-semibold text-zinc-700">
-                  {withdrawal.owner?.email ?? withdrawal.bankAccountName}
+                  {withdrawal.bankAccountName}
                 </span>
                 . Saldo owner tidak akan berubah.
               </>
@@ -352,37 +344,6 @@ function DetailDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Owner info */}
-          {withdrawal.owner && (
-            <div className="space-y-1.5">
-              <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-                Info Owner
-              </p>
-              <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-3 space-y-1.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Email</span>
-                  <span className="text-zinc-700">
-                    {withdrawal.owner.email}
-                  </span>
-                </div>
-                {withdrawal.owner.name && (
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Nama</span>
-                    <span className="text-zinc-700">
-                      {withdrawal.owner.name}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Saldo Wallet</span>
-                  <span className="text-zinc-700 font-medium tabular-nums">
-                    {formatRupiah(withdrawal.owner.walletBalance)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Request info */}
           <div className="space-y-1.5">
             <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
@@ -565,7 +526,7 @@ export default function WithdrawalsPage() {
                   Tanggal Request
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Email Owner
+                  Atas Nama
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                   Jumlah
@@ -648,13 +609,8 @@ export default function WithdrawalsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-sm text-zinc-700">
-                          {w.owner?.email ?? "—"}
+                          {w.bankAccountName}
                         </p>
-                        {w.owner?.name && (
-                          <p className="text-xs text-zinc-400">
-                            {w.owner.name}
-                          </p>
-                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <p className="text-sm font-medium text-zinc-900 tabular-nums">

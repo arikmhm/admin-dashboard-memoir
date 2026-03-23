@@ -42,6 +42,10 @@ const TX_STATUS_MAP: Record<TxStatus, { label: string; className: string }> = {
     label: "Gagal",
     className: "bg-red-50 text-red-700 border-red-200",
   },
+  EXPIRED: {
+    label: "Kedaluwarsa",
+    className: "bg-zinc-100 text-zinc-500 border-zinc-200",
+  },
 };
 
 const PAYMENT_METHOD_MAP: Record<PaymentMethod, string> = {
@@ -408,11 +412,6 @@ export default function TransactionsPage() {
                         <p className="text-xs text-zinc-700">
                           {tx.owner?.email ?? "—"}
                         </p>
-                        {tx.owner?.name && (
-                          <p className="text-[10px] text-zinc-400">
-                            {tx.owner.name}
-                          </p>
-                        )}
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
                         <p className="text-xs text-zinc-500">
@@ -426,7 +425,7 @@ export default function TransactionsPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <p className="text-xs font-medium text-zinc-900 tabular-nums">
-                          {formatRupiah(tx.amount)}
+                          {formatRupiah(tx.totalAmount)}
                         </p>
                       </td>
                       <td className="px-4 py-3 text-center">

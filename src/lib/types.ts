@@ -6,20 +6,8 @@
 // ── Enums (mirror backend DB enums) ──────────────────────────────────────────
 
 export type UserRole = "platform_admin" | "studio_owner";
-export type BillingPeriod = "MONTHLY" | "YEARLY";
-export type SubscriptionStatus =
-  | "ACTIVE"
-  | "PENDING_PAYMENT"
-  | "EXPIRED"
-  | "CANCELLED"
-  | "GRACE_PERIOD";
-export type TxStatus = "PENDING" | "PAID" | "FAILED";
+export type TxStatus = "PENDING" | "PAID" | "FAILED" | "EXPIRED";
 export type PaymentMethod = "PG" | "CASH" | "STATIC_QRIS";
-export type MutationType = "CREDIT" | "DEBIT";
-export type MutationCategory =
-  | "TRANSACTION_INCOME"
-  | "WITHDRAWAL"
-  | "ADJUSTMENT";
 export type WithdrawalStatus = "PENDING" | "PROCESSED" | "REJECTED";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -28,7 +16,6 @@ export interface AuthUser {
   id: string;
   email: string;
   role: UserRole;
-  name?: string;
 }
 
 export interface LoginRequest {
@@ -48,29 +35,11 @@ export interface LoginResponse {
 export interface Owner {
   id: string;
   email: string;
-  name: string | null;
   role: UserRole;
   walletBalance: number;
   deletedAt: string | null;
   createdAt: string;
-}
-
-export interface OwnerDetail extends Owner {
-  kiosks: Kiosk[];
-  recentTransactions: Transaction[];
-  recentMutations: WalletMutation[];
-  pendingWithdrawal: Withdrawal | null;
-  subscription: OwnerSubscription | null;
-}
-
-export interface OwnerSubscription {
-  id: string;
-  planId: string;
-  billingPeriod: BillingPeriod;
-  status: SubscriptionStatus;
-  pricePaid: number;
-  currentPeriodEnd: string | null;
-  plan?: SubscriptionPlan;
+  updatedAt: string;
 }
 
 // ── Kiosk ────────────────────────────────────────────────────────────────────
@@ -93,7 +62,6 @@ export interface SubscriptionPlan {
   priceMonthly: number;
   priceYearly: number;
   isActive: boolean;
-  ownerCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -143,8 +111,9 @@ export interface Withdrawal {
   rejectionNote: string | null;
   processedBy: string | null;
   processedAt: string | null;
+  walletMutationId: string | null;
   createdAt: string;
-  owner?: Pick<Owner, "id" | "email" | "name" | "walletBalance">;
+  updatedAt: string;
 }
 
 export interface RejectWithdrawalRequest {
@@ -156,40 +125,24 @@ export interface RejectWithdrawalRequest {
 export interface Transaction {
   id: string;
   orderId: string;
-  userId: string;
+  ownerId: string;
   kioskId: string;
   templateId: string;
   paymentMethod: PaymentMethod;
-  amount: number;
+  qrString: string | null;
+  paymentExpiresAt: string | null;
+  printQty: number;
+  hasDigitalCopy: boolean;
+  appliedBasePrice: number;
+  appliedExtraPrintPrice: number;
+  appliedDigitalCopyPrice: number;
+  totalAmount: number;
   status: TxStatus;
   createdAt: string;
-  owner?: Pick<Owner, "id" | "email" | "name">;
+  paidAt: string | null;
+  owner?: Pick<Owner, "id" | "email">;
   kiosk?: Pick<Kiosk, "id" | "name">;
   template?: { id: string; name: string };
-}
-
-// ── Wallet Mutation ──────────────────────────────────────────────────────────
-
-export interface WalletMutation {
-  id: string;
-  userId: string;
-  type: MutationType;
-  category: MutationCategory;
-  amount: number;
-  balanceAfter: number;
-  referenceId: string | null;
-  description: string | null;
-  createdAt: string;
-}
-
-// ── Dashboard Stats ──────────────────────────────────────────────────────────
-
-export interface DashboardStats {
-  activeOwners: number;
-  expiredOrGraceOwners: number;
-  todayTransactions: number;
-  pendingWithdrawals: number;
-  totalPlatformBalance: number;
 }
 
 // ── Pagination ───────────────────────────────────────────────────────────────
@@ -210,5 +163,4 @@ export interface PaginatedResponse<T> {
 export interface CreateOwnerRequest {
   email: string;
   password: string;
-  name?: string;
 }

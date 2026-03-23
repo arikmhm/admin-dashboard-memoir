@@ -71,7 +71,7 @@ function CreateOwnerDialog({
     formState: { errors },
     setError,
   } = useForm<CreateOwnerRequest>({
-    defaultValues: { email: "", password: "", name: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   const onSubmit = async (data: CreateOwnerRequest) => {
@@ -79,7 +79,6 @@ function CreateOwnerDialog({
       await createOwner.mutateAsync({
         email: data.email.trim().toLowerCase(),
         password: data.password,
-        name: data.name?.trim() || undefined,
       });
       toast.success("Owner berhasil dibuat", {
         description: "Kirimkan password sementara ke owner via WhatsApp/email.",
@@ -171,16 +170,6 @@ function CreateOwnerDialog({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Nama (opsional)</Label>
-            <Input
-              id="name"
-              placeholder="Nama studio owner"
-              autoComplete="off"
-              {...register("name")}
-            />
-          </div>
-
           <DialogFooter>
             <Button
               type="button"
@@ -237,11 +226,7 @@ export default function OwnersPage() {
     // Search by email
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(
-        (o) =>
-          o.email.toLowerCase().includes(q) ||
-          (o.name && o.name.toLowerCase().includes(q)),
-      );
+      result = result.filter((o) => o.email.toLowerCase().includes(q));
     }
 
     return result;
@@ -315,7 +300,7 @@ export default function OwnersPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-400" />
           <Input
-            placeholder="Cari email atau nama..."
+            placeholder="Cari email..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={handleSearchKeyDown}
@@ -381,9 +366,6 @@ export default function OwnersPage() {
                   Email
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
-                  Nama
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden lg:table-cell">
                   Tgl Daftar
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
@@ -404,9 +386,6 @@ export default function OwnersPage() {
                         <Skeleton className="h-3 w-36" />
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <Skeleton className="h-3 w-24" />
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
                         <Skeleton className="h-3 w-28" />
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -423,7 +402,7 @@ export default function OwnersPage() {
               {/* Empty state */}
               {!isLoading && filteredOwners.length === 0 && !error && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-16 text-center">
+                  <td colSpan={4} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center">
                         <Users className="size-4 text-zinc-400" />
@@ -531,9 +510,6 @@ function OwnerRow({ owner, onClick }: { owner: Owner; onClick: () => void }) {
         <p className="text-sm text-zinc-700">{owner.email}</p>
       </td>
       <td className="px-4 py-3 hidden md:table-cell">
-        <p className="text-xs text-zinc-500">{owner.name || "—"}</p>
-      </td>
-      <td className="px-4 py-3 hidden lg:table-cell">
         <p className="text-xs text-zinc-500">{formatDate(owner.createdAt)}</p>
       </td>
       <td className="px-4 py-3 text-right">

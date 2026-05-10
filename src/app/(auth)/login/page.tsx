@@ -15,14 +15,30 @@ import {
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    switch (err.status) {
+      case 400:
+        return "Email atau password tidak valid";
+      case 401:
+        return "Email atau password salah";
+      case 429:
+        return "Terlalu banyak percobaan, coba lagi nanti";
+      default:
+        return err.message || "Terjadi kesalahan, coba lagi nanti";
+    }
+  }
+  return "Terjadi kesalahan, coba lagi nanti";
+}
+
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
@@ -30,22 +46,18 @@ export default function LoginPage() {
     try {
       await login({ email, password });
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.status === 401) {
-          setError("Email atau password salah");
-        } else if (err.status === 429) {
-          setError("Terlalu banyak percobaan, coba lagi nanti");
-        } else {
-          setError(err.message);
-        }
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Terjadi kesalahan, coba lagi nanti");
-      }
+      setError(getErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" aria-label="Memuat..." />
+      </div>
+    );
   }
 
   return (

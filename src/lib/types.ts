@@ -5,7 +5,7 @@
 
 // ── Enums (mirror backend DB enums) ──────────────────────────────────────────
 
-export type UserRole = "platform_admin" | "studio_owner";
+export type UserRole = "ADMIN" | "OWNER";
 export type TxStatus = "PENDING" | "PAID" | "FAILED" | "EXPIRED";
 export type PaymentMethod = "PG" | "CASH" | "STATIC_QRIS";
 export type WithdrawalStatus = "PENDING" | "PROCESSED" | "REJECTED";
@@ -72,6 +72,7 @@ export interface CreatePlanRequest {
   maxKiosks: number;
   priceMonthly: number;
   priceYearly: number;
+  isActive?: boolean;
 }
 
 export interface UpdatePlanRequest {
@@ -90,7 +91,7 @@ export interface PlatformConfig {
   key: string;
   value: string;
   description: string | null;
-  updatedBy: string | null;
+  updatedBy: string;
   updatedAt: string;
 }
 
@@ -140,9 +141,6 @@ export interface Transaction {
   status: TxStatus;
   createdAt: string;
   paidAt: string | null;
-  owner?: Pick<Owner, "id" | "email">;
-  kiosk?: Pick<Kiosk, "id" | "name">;
-  template?: { id: string; name: string };
 }
 
 // ── Pagination ───────────────────────────────────────────────────────────────

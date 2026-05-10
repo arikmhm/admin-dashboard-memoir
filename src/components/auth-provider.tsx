@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // memoir. — Auth Context Provider (Admin Dashboard)
 // Provides auth state (user) to the entire app.
-// Routes: /login (public), everything else (auth + role=platform_admin).
+// Routes: /login (public), everything else (auth + role=ADMIN).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -15,7 +15,12 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getToken, removeToken } from "@/lib/api";
+import {
+  getToken,
+  removeToken,
+  refreshAccessToken,
+  TOKEN_REMOVED_EVENT,
+} from "@/lib/api";
 import { login as apiLogin, logout as apiLogout } from "@/lib/auth-api";
 import type { AuthUser, LoginRequest } from "@/lib/types";
 
@@ -43,8 +48,9 @@ function decodeTokenPayload(token: string): AuthUser | null {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const payload = JSON.parse(atob(base64));
+    if (!payload.id || !payload.role) return null;
     return {
-      id: payload.id ?? payload.sub,
+      id: payload.id,
       email: payload.email ?? "",
       role: payload.role,
     };
@@ -79,32 +85,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function init() {
-      const token = getToken();
-
+      // After page refresh, in-memory token is empty.
+      // On public routes (e.g. /login after logout), skip refresh entirely —
+      // avoids a wasted 401 call.
+      let token = getToken();
       if (!token) {
-        setIsLoading(false);
-        if (!isPublicRoute(pathname)) {
-          router.replace("/login");
+        if (isPublicRoute(window.location.pathname)) {
+          setIsLoading(false);
+          return;
         }
-        return;
+        token = await refreshAccessToken();
+        if (!token) {
+          // No valid session — hard-redirect so the page runs fresh.
+          window.location.href = "/login";
+          return;
+        }
       }
 
       // Decode user from token
       const decoded = decodeTokenPayload(token);
       if (!decoded) {
         removeToken();
-        setIsLoading(false);
-        if (!isPublicRoute(pathname)) {
-          router.replace("/login");
+        if (!isPublicRoute(window.location.pathname)) {
+          window.location.href = "/login";
+        } else {
+          setIsLoading(false);
         }
         return;
       }
 
-      // Role guard: only platform_admin allowed
-      if (decoded.role !== "platform_admin") {
+      // Role guard: only admin allowed
+      if (decoded.role !== "ADMIN") {
         removeToken();
         setIsLoading(false);
-        if (!isPublicRoute(pathname)) {
+        if (!isPublicRoute(window.location.pathname)) {
           router.replace("/login");
         }
         return;
@@ -114,13 +128,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
 
       // Redirect authenticated admin away from login
-      if (isPublicRoute(pathname)) {
+      if (isPublicRoute(window.location.pathname)) {
         router.replace("/");
       }
     }
 
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Force-logout on token removal (e.g. 401 + refresh failure) ──────────
+
+  useEffect(() => {
+    const handleTokenRemoved = () => {
+      setUser(null);
+      // isAuthenticated becomes false → route protection effect redirects to /login
+    };
+
+    window.addEventListener(TOKEN_REMOVED_EVENT, handleTokenRemoved);
+    return () =>
+      window.removeEventListener(TOKEN_REMOVED_EVENT, handleTokenRemoved);
   }, []);
 
   // ── Route protection on navigation ───────────────────────────────────────
@@ -144,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: loggedInUser } = await apiLogin(credentials);
 
       // Role guard: reject non-admin
-      if (loggedInUser.role !== "platform_admin") {
+      if (loggedInUser.role !== "ADMIN") {
         removeToken();
         throw new Error("Akses tidak diizinkan. Hanya admin yang bisa login.");
       }
@@ -157,9 +184,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Logout ───────────────────────────────────────────────────────────────
 
-  const logout = useCallback(() => {
-    setUser(null);
-    apiLogout();
+  const logout = useCallback(async () => {
+    // 1. Show loading spinner (prevents dashboard crash with null state)
+    setIsLoading(true);
+    // 2. Clear cookie + delete token from DB via Next.js route handler
+    try {
+      await apiLogout();
+    } catch {
+      // Same-origin call — failure extremely unlikely
+    }
+    // 3. Clear in-memory token so no API calls can be made
+    removeToken();
+    // 4. Full page reload to /login — resets all in-memory state, query cache
+    window.location.href = "/login";
   }, []);
 
   return (

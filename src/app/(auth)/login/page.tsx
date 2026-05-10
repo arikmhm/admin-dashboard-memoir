@@ -1,19 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, AlertCircle } from "lucide-react";
+
+// ── Zod schema ────────────────────────────────────────────────────────────────
+
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email wajib diisi")
+    .email("Format email tidak valid"),
+  password: z.string().min(1, "Password wajib diisi"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+// ── Error mapping ─────────────────────────────────────────────────────────────
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
@@ -31,95 +41,144 @@ function getErrorMessage(err: unknown): string {
   return "Terjadi kesalahan, coba lagi nanti";
 }
 
+// ── Page component ────────────────────────────────────────────────────────────
+
 export default function LoginPage() {
   const { login, isLoading: authLoading } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
+  const onSubmit = async (data: LoginFormValues) => {
+    setApiError(null);
     try {
-      await login({ email, password });
+      await login({ email: data.email.trim(), password: data.password });
     } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
+      setApiError(getErrorMessage(err));
     }
-  }
+  };
+
+  const isFormDisabled = isSubmitting || authLoading;
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" aria-label="Memuat..." />
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2
+          className="h-5 w-5 animate-spin text-zinc-400"
+          aria-label="Memuat..."
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl font-semibold tracking-tight">
-            memoir<span className="text-zinc-400">.</span>
-          </CardTitle>
-          <CardDescription>Admin Dashboard</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@memoir.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                disabled={isSubmitting}
-              />
-            </div>
+    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="w-full max-w-sm space-y-6">
+        {/* Logo / Brand */}
+        <div className="text-center space-y-1">
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">
+            memoir<span className="text-zinc-300">.</span>
+          </h1>
+          <p className="text-sm text-zinc-500">Admin Dashboard</p>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            {error && (
-              <p className="text-sm text-destructive text-center">{error}</p>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isSubmitting || !email || !password}
+        {/* Login Card */}
+        <Card className="border-zinc-200 shadow-none rounded-sm">
+          <CardContent className="pt-6 pb-6 px-6">
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="space-y-4"
+              noValidate
+              aria-label="Form login"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Masuk...
-                </>
-              ) : (
-                "Masuk"
+              {/* API Error alert */}
+              {apiError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 px-3 py-2.5"
+                >
+                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-red-700">{apiError}</p>
+                </div>
               )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+
+              {/* Email field */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="login-email"
+                  className="text-xs font-medium text-zinc-600 uppercase tracking-wider"
+                >
+                  Email
+                </label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  placeholder="admin@memoir.com"
+                  autoComplete="email"
+                  disabled={isFormDisabled}
+                  aria-invalid={!!errors.email || !!apiError}
+                  {...register("email")}
+                />
+                {errors.email && (
+                  <p className="text-xs text-red-600">{errors.email.message}</p>
+                )}
+              </div>
+
+              {/* Password field */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="login-password"
+                  className="text-xs font-medium text-zinc-600 uppercase tracking-wider"
+                >
+                  Password
+                </label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  disabled={isFormDisabled}
+                  aria-invalid={!!errors.password}
+                  {...register("password")}
+                />
+                {errors.password && (
+                  <p className="text-xs text-red-600">
+                    {errors.password.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Submit button */}
+              <Button
+                type="submit"
+                disabled={isFormDisabled}
+                className="w-full"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memproses...
+                  </>
+                ) : (
+                  "Masuk"
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Footer note */}
+        <p className="text-xs text-zinc-400 text-center">
+          Belum punya akses? Hubungi tim memoir.
+        </p>
+      </div>
     </div>
   );
 }

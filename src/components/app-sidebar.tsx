@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -26,6 +27,14 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/components/auth-provider";
 
@@ -58,6 +67,7 @@ const NAV_ITEMS = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   // Derive display info from auth context
   const displayName = user?.email?.split("@")[0] ?? "admin";
@@ -132,7 +142,7 @@ export function AppSidebar() {
             </p>
           </div>
           <button
-            onClick={logout}
+            onClick={() => setLogoutOpen(true)}
             className="shrink-0 text-zinc-400 hover:text-zinc-950 transition-colors group-data-[collapsible=icon]:hidden"
             aria-label="Keluar"
           >
@@ -140,6 +150,26 @@ export function AppSidebar() {
           </button>
         </div>
       </SidebarFooter>
+
+      {/* Logout Confirmation */}
+      <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Keluar dari akun?</DialogTitle>
+            <DialogDescription>
+              Kamu perlu login ulang untuk mengakses dashboard.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setLogoutOpen(false)}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={logout}>
+              Keluar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 }

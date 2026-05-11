@@ -56,7 +56,7 @@ function SidebarToggle() {
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/owners", label: "Studio Owner", icon: Users },
+  { href: "/owners", label: "Owner", icon: Users },
   { href: "/plans", label: "Subscription Plans", icon: CreditCard },
   { href: "/config", label: "Platform Config", icon: Settings },
   { href: "/transactions", label: "Transaksi", icon: ReceiptText },

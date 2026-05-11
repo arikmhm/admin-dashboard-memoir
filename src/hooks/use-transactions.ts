@@ -79,6 +79,7 @@ export function useTransactions(options?: UseTransactionsOptions) {
     transactions,
     meta,
     isLoading: query.isLoading,
+    isRefetching: query.isRefetching,
     error: query.error as Error | null,
     refresh,
   };

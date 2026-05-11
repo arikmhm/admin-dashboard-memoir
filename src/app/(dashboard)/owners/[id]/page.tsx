@@ -1,10 +1,5 @@
 "use client";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// memoir. — Owner Detail Page (FEAT-SA-03)
-// Owner info, recent transactions, deactivate/restore action
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -20,7 +15,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -38,27 +32,34 @@ import type { TxStatus, PaymentMethod } from "@/lib/types";
 
 // ── Status / Payment helpers ─────────────────────────────────────────────────
 
-const TX_STATUS_MAP: Record<TxStatus, { label: string; className: string }> = {
+const TX_STATUS_CONFIG: Record<
+  TxStatus,
+  { label: string; dotClass: string; textClass: string }
+> = {
   PAID: {
     label: "Lunas",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    dotClass: "bg-emerald-500",
+    textClass: "text-emerald-700",
   },
   PENDING: {
     label: "Pending",
-    className: "bg-amber-50 text-amber-700 border-amber-200",
+    dotClass: "bg-amber-500",
+    textClass: "text-amber-700",
   },
   FAILED: {
     label: "Gagal",
-    className: "bg-red-50 text-red-700 border-red-200",
+    dotClass: "bg-red-500",
+    textClass: "text-red-700",
   },
   EXPIRED: {
     label: "Kedaluwarsa",
-    className: "bg-zinc-100 text-zinc-500 border-zinc-200",
+    dotClass: "bg-zinc-400",
+    textClass: "text-zinc-500",
   },
 };
 
-const PAYMENT_METHOD_MAP: Record<PaymentMethod, string> = {
-  CASH: "Cash",
+const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  CASH: "Tunai",
   PG: "Payment Gateway",
   STATIC_QRIS: "QRIS",
 };
@@ -73,7 +74,6 @@ function OwnerDetailContent({ id }: { id: string }) {
     "deactivate" | "restore" | null
   >(null);
 
-  // Fetch recent transactions for this owner
   const {
     transactions,
     isLoading: txLoading,
@@ -118,28 +118,41 @@ function OwnerDetailContent({ id }: { id: string }) {
             <Skeleton className="h-3 w-32" />
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-lg border p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="rounded-sm border p-4 space-y-3">
               <Skeleton className="h-3 w-16" />
               <Skeleton className="h-5 w-32" />
             </div>
           ))}
         </div>
-        <div className="rounded-lg border">
-          <div className="p-4 border-b">
+        <div className="rounded-sm border border-zinc-200 overflow-hidden">
+          <div className="px-4 py-3 border-b bg-zinc-50">
             <Skeleton className="h-4 w-32" />
           </div>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-4 p-4 border-b last:border-0"
-            >
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="h-3 w-20 ml-auto" />
-            </div>
-          ))}
+          <table className="w-full">
+            <tbody className="divide-y divide-zinc-100">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <Skeleton className="h-3 w-24" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Skeleton className="h-3 w-28" />
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <Skeleton className="h-3 w-16" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Skeleton className="h-3 w-20 ml-auto" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Skeleton className="h-3 w-16 ml-auto" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     );
@@ -159,7 +172,7 @@ function OwnerDetailContent({ id }: { id: string }) {
           <ArrowLeft className="size-3.5" />
           Kembali
         </Button>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center">
+        <div className="rounded-sm border border-red-200 bg-red-50 p-8 text-center">
           <AlertTriangle className="size-8 text-red-400 mx-auto mb-3" />
           <p className="font-medium text-red-700 text-sm">
             {error?.message ?? "Owner tidak ditemukan"}
@@ -184,7 +197,7 @@ function OwnerDetailContent({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       {/* Back + Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-200">
         <div className="space-y-3">
           <Button
             variant="ghost"
@@ -195,22 +208,25 @@ function OwnerDetailContent({ id }: { id: string }) {
             <ArrowLeft className="size-3.5" />
             Kembali
           </Button>
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight flex items-center gap-2">
-                {owner.email}
-                <Badge
-                  className={cn(
-                    "text-[10px]",
-                    isActive
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-zinc-100 text-zinc-500 border-zinc-200",
-                  )}
-                >
-                  {isActive ? "Aktif" : "Nonaktif"}
-                </Badge>
-              </h1>
-              <p className="text-sm text-zinc-500 mt-0.5">{owner.email}</p>
+          <div>
+            <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+              {owner.email}
+            </h1>
+            <div
+              className={cn(
+                "flex items-center gap-1.5 mt-1",
+                isActive ? "text-emerald-700" : "text-zinc-500",
+              )}
+            >
+              <span
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full shrink-0",
+                  isActive ? "bg-emerald-500" : "bg-zinc-400",
+                )}
+              />
+              <span className="text-xs">
+                {isActive ? "Aktif" : "Nonaktif"}
+              </span>
             </div>
           </div>
         </div>
@@ -264,96 +280,114 @@ function OwnerDetailContent({ id }: { id: string }) {
       </div>
 
       {/* Recent Transactions */}
-      <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+      <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
         <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
           <h2 className="text-sm font-medium text-zinc-900 flex items-center gap-2">
             <ReceiptText className="size-3.5 text-zinc-400" />
             Transaksi Terakhir
           </h2>
-          <span className="text-xs text-zinc-400">Menampilkan 10 terbaru</span>
+          <span className="text-xs text-zinc-400">10 terbaru</span>
         </div>
 
-        {txLoading && (
-          <div className="divide-y divide-zinc-100">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-4 py-3">
-                <Skeleton className="h-3 w-28" />
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-5 w-14 rounded-full" />
-                <Skeleton className="h-3 w-20 ml-auto" />
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50">
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
+                  Tanggal
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                  Order ID
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden sm:table-cell">
+                  Metode
+                </th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                  Total
+                </th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {/* Loading skeleton */}
+              {txLoading &&
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-2.5 hidden md:table-cell">
+                      <Skeleton className="h-3 w-24" />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Skeleton className="h-3 w-28" />
+                    </td>
+                    <td className="px-4 py-2.5 hidden sm:table-cell">
+                      <Skeleton className="h-3 w-16" />
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Skeleton className="h-3 w-16 ml-auto" />
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Skeleton className="h-3 w-14 ml-auto" />
+                    </td>
+                  </tr>
+                ))}
 
-        {!txLoading && transactions.length === 0 && (
-          <div className="px-4 py-12 text-center">
-            <ReceiptText className="size-6 text-zinc-300 mx-auto mb-2" />
-            <p className="text-sm text-zinc-400">Belum ada transaksi</p>
-          </div>
-        )}
-
-        {!txLoading && transactions.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-100">
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                    Order ID
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden sm:table-cell">
-                    Metode
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                    Jumlah
-                  </th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
-                    Tanggal
-                  </th>
+              {/* Empty state */}
+              {!txLoading && transactions.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-12 text-center">
+                    <ReceiptText className="size-6 text-zinc-300 mx-auto mb-2" />
+                    <p className="text-sm text-zinc-400">Belum ada transaksi</p>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {transactions.map((tx) => {
-                  const statusInfo = TX_STATUS_MAP[tx.status];
+              )}
+
+              {/* Data rows */}
+              {!txLoading &&
+                transactions.map((tx) => {
+                  const sc = TX_STATUS_CONFIG[tx.status];
                   return (
-                    <tr key={tx.id} className="hover:bg-zinc-50/50">
-                      <td className="px-4 py-2.5">
+                    <tr
+                      key={tx.id}
+                      className="hover:bg-zinc-50/50 transition-colors"
+                    >
+                      <td className="px-4 py-2.5 text-xs text-zinc-500 hidden md:table-cell align-top">
+                        {formatDateTime(tx.createdAt)}
+                      </td>
+                      <td className="px-4 py-2.5 align-top">
                         <p className="text-xs font-mono text-zinc-600">
                           {tx.orderId}
                         </p>
                       </td>
-                      <td className="px-4 py-2.5 hidden sm:table-cell">
-                        <p className="text-xs text-zinc-500">
-                          {PAYMENT_METHOD_MAP[tx.paymentMethod]}
-                        </p>
+                      <td className="px-4 py-2.5 text-xs text-zinc-500 hidden sm:table-cell align-top">
+                        {PAYMENT_METHOD_LABEL[tx.paymentMethod]}
                       </td>
-                      <td className="px-4 py-2.5">
-                        <Badge
-                          className={cn("text-[10px]", statusInfo.className)}
+                      <td className="px-4 py-2.5 text-right text-xs font-medium text-zinc-900 tabular-nums align-top">
+                        {formatRupiah(tx.totalAmount)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right align-top">
+                        <div
+                          className={cn(
+                            "flex items-center justify-end gap-1.5",
+                            sc.textClass,
+                          )}
                         >
-                          {statusInfo.label}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <p className="text-xs font-medium text-zinc-900 tabular-nums">
-                          {formatRupiah(tx.totalAmount)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-2.5 text-right hidden md:table-cell">
-                        <p className="text-xs text-zinc-500">
-                          {formatDateTime(tx.createdAt)}
-                        </p>
+                          <span
+                            className={cn(
+                              "w-1.5 h-1.5 rounded-full shrink-0",
+                              sc.dotClass,
+                            )}
+                          />
+                          <span className="text-xs">{sc.label}</span>
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Deactivate / Restore Confirmation Dialog */}
@@ -413,29 +447,20 @@ function InfoCard({
   icon: Icon,
   label,
   value,
-  highlight,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
-  highlight?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 space-y-2">
+    <div className="rounded-sm border border-zinc-200 bg-white p-4 space-y-2">
       <div className="flex items-center gap-1.5">
         <Icon className="size-3 text-zinc-400" />
         <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
           {label}
         </p>
       </div>
-      <p
-        className={cn(
-          "text-sm font-medium truncate",
-          highlight ? "text-zinc-950" : "text-zinc-700",
-        )}
-      >
-        {value}
-      </p>
+      <p className="text-sm font-medium text-zinc-700 truncate">{value}</p>
     </div>
   );
 }

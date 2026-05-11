@@ -1,20 +1,14 @@
 "use client";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// memoir. — Transaction Monitoring Page (FEAT-SA-07)
-// Read-only cross-owner transaction list with filters & pagination
-// ─────────────────────────────────────────────────────────────────────────────
-
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   Search,
-  X,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  X,
+  SlidersHorizontal,
   ReceiptText,
-  AlertTriangle,
-  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,282 +21,298 @@ import type { TxStatus, PaymentMethod } from "@/lib/types";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 20;
+const DEFAULT_LIMIT = 20;
+const LIMIT_OPTIONS = [10, 25, 50];
 
-const TX_STATUS_MAP: Record<TxStatus, { label: string; className: string }> = {
+const TX_STATUS_CONFIG: Record<
+  TxStatus,
+  { label: string; dotClass: string; textClass: string }
+> = {
   PAID: {
     label: "Lunas",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    dotClass: "bg-emerald-500",
+    textClass: "text-emerald-700",
   },
   PENDING: {
     label: "Pending",
-    className: "bg-amber-50 text-amber-700 border-amber-200",
+    dotClass: "bg-amber-500",
+    textClass: "text-amber-700",
   },
   FAILED: {
     label: "Gagal",
-    className: "bg-red-50 text-red-700 border-red-200",
+    dotClass: "bg-red-500",
+    textClass: "text-red-700",
   },
   EXPIRED: {
     label: "Kedaluwarsa",
-    className: "bg-zinc-100 text-zinc-500 border-zinc-200",
+    dotClass: "bg-zinc-400",
+    textClass: "text-zinc-500",
   },
 };
 
-const PAYMENT_METHOD_MAP: Record<PaymentMethod, string> = {
-  CASH: "Cash",
+const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  CASH: "Tunai",
   PG: "Payment Gateway",
   STATIC_QRIS: "QRIS",
 };
 
-type StatusFilter = TxStatus | undefined;
-type MethodFilter = PaymentMethod | undefined;
-
-const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: undefined, label: "Semua" },
+const STATUS_OPTIONS: { value: TxStatus; label: string }[] = [
   { value: "PAID", label: "Lunas" },
   { value: "PENDING", label: "Pending" },
   { value: "FAILED", label: "Gagal" },
   { value: "EXPIRED", label: "Kedaluwarsa" },
 ];
 
-const METHOD_OPTIONS: { value: MethodFilter; label: string }[] = [
-  { value: undefined, label: "Semua" },
-  { value: "CASH", label: "Cash" },
-  { value: "PG", label: "PG" },
+const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
+  { value: "CASH", label: "Tunai" },
   { value: "STATIC_QRIS", label: "QRIS" },
+  { value: "PG", label: "Payment Gateway" },
 ];
+
+// ── Filter state type ────────────────────────────────────────────────────────
+
+interface Filters {
+  status?: TxStatus;
+  paymentMethod?: PaymentMethod;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  page: number;
+  limit: number;
+}
 
 // ── Transactions Page ────────────────────────────────────────────────────────
 
 export default function TransactionsPage() {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(undefined);
-  const [methodFilter, setMethodFilter] = useState<MethodFilter>(undefined);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [filters, setFilters] = useState<Filters>({
+    page: 1,
+    limit: DEFAULT_LIMIT,
+  });
   const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Debounce search
+  const { transactions, meta, isLoading, isRefetching, error, refresh } =
+    useTransactions({
+      status: filters.status,
+      paymentMethod: filters.paymentMethod,
+      startDate: filters.startDate
+        ? new Date(filters.startDate).toISOString()
+        : undefined,
+      endDate: filters.endDate
+        ? new Date(filters.endDate + "T23:59:59").toISOString()
+        : undefined,
+      search: filters.search,
+      page: filters.page,
+      limit: filters.limit,
+    });
+
+  // Search debounce (300ms)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setSearch(searchInput.trim());
-      setPage(1);
+      const trimmed = searchInput.trim();
+      setFilters((prev) => {
+        if ((prev.search ?? "") === (trimmed || "")) return prev;
+        return { ...prev, search: trimmed || undefined, page: 1 };
+      });
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [searchInput]);
 
-  const { transactions, meta, isLoading, error, refresh } = useTransactions({
-    status: statusFilter,
-    paymentMethod: methodFilter,
-    startDate: startDate ? new Date(startDate).toISOString() : undefined,
-    endDate: endDate
-      ? new Date(endDate + "T23:59:59").toISOString()
-      : undefined,
-    search: search || undefined,
-    page,
-    limit: PAGE_SIZE,
-  });
+  const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 0;
+  const currentPage = meta?.page ?? 1;
+  const colSpan = 6;
 
-  const totalPages = Math.ceil(meta.total / PAGE_SIZE);
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.status) count++;
+    if (filters.paymentMethod) count++;
+    if (filters.startDate || filters.endDate) count++;
+    if (filters.search) count++;
+    return count;
+  }, [filters]);
 
-  const handleStatusChange = useCallback((value: StatusFilter) => {
-    setStatusFilter(value);
-    setPage(1);
-  }, []);
-
-  const handleMethodChange = useCallback((value: MethodFilter) => {
-    setMethodFilter(value);
-    setPage(1);
-  }, []);
+  const updateFilter = useCallback(
+    <K extends keyof Filters>(key: K, value: Filters[K]) => {
+      setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+    },
+    [],
+  );
 
   const clearSearch = useCallback(() => {
     setSearchInput("");
-    setSearch("");
-    setPage(1);
+    setFilters((prev) => ({ ...prev, search: undefined, page: 1 }));
   }, []);
 
   const clearAllFilters = useCallback(() => {
-    setStatusFilter(undefined);
-    setMethodFilter(undefined);
-    setStartDate("");
-    setEndDate("");
     setSearchInput("");
-    setSearch("");
-    setPage(1);
+    setFilters({ page: 1, limit: DEFAULT_LIMIT });
   }, []);
 
-  const hasActiveFilters =
-    statusFilter !== undefined ||
-    methodFilter !== undefined ||
-    startDate !== "" ||
-    endDate !== "" ||
-    search !== "";
+  const goToPage = useCallback((page: number) => {
+    setFilters((prev) => ({ ...prev, page }));
+  }, []);
+
+  const handleLimitChange = useCallback((newLimit: number) => {
+    setFilters((prev) => ({ ...prev, limit: newLimit, page: 1 }));
+  }, []);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-100">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-            Transaksi
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Monitoring transaksi lintas semua owner.
-            {!isLoading && (
-              <span className="text-zinc-400 ml-1">{meta.total} transaksi</span>
+      {/* Page Header */}
+      <div className="pb-5 border-b border-zinc-200">
+        <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+          Transaksi
+        </h1>
+      </div>
+
+      {/* Search & Filter Bar */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-400" />
+            <Input
+              placeholder="Cari order ID atau email owner..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="h-8 pl-9 pr-8 text-xs"
+            />
+            {searchInput && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              >
+                <X className="size-3" />
+              </button>
             )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+          </div>
+
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowFilters(!showFilters)}
+            onClick={() => setShowFilters((prev) => !prev)}
             className={cn("h-8 text-xs gap-1.5", showFilters && "bg-zinc-100")}
           >
-            <Filter className="size-3" />
+            <SlidersHorizontal className="size-3" />
             Filter
-            {hasActiveFilters && (
-              <span className="ml-0.5 h-4 min-w-4 rounded-full bg-zinc-900 text-white text-[10px] flex items-center justify-center px-1">
-                !
-              </span>
+            {activeFilterCount > 0 && (
+              <Badge className="bg-zinc-950 text-white text-[10px] px-1.5 py-0 ml-0.5">
+                {activeFilterCount}
+              </Badge>
             )}
           </Button>
+
           <Button
             variant="outline"
             size="sm"
             onClick={refresh}
+            disabled={isRefetching}
             className="h-8 text-xs gap-1.5"
           >
-            <RefreshCw className={cn("size-3", isLoading && "animate-spin")} />
+            <RefreshCw
+              className={cn("size-3", isRefetching && "animate-spin")}
+            />
           </Button>
-        </div>
-      </div>
 
-      {/* Search bar (always visible) */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-400" />
-          <Input
-            placeholder="Cari order ID atau email owner..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="h-8 pl-9 pr-8 text-xs"
-          />
-          {searchInput && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+          {activeFilterCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              className="h-8 text-xs text-zinc-500"
             >
-              <X className="size-3" />
-            </button>
+              Reset
+            </Button>
           )}
         </div>
 
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearAllFilters}
-            className="h-8 text-xs text-zinc-400 hover:text-zinc-700"
-          >
-            Reset filter
-          </Button>
+        {/* Filter panel */}
+        {showFilters && (
+          <div className="flex flex-wrap items-end gap-x-5 gap-y-4 p-4 rounded-sm border border-zinc-200 bg-zinc-50/50">
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+                Status
+              </label>
+              <select
+                value={filters.status ?? ""}
+                onChange={(e) =>
+                  updateFilter(
+                    "status",
+                    (e.target.value as TxStatus) || undefined,
+                  )
+                }
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 pr-7 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+              >
+                <option value="">Semua Status</option>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+                Metode
+              </label>
+              <select
+                value={filters.paymentMethod ?? ""}
+                onChange={(e) =>
+                  updateFilter(
+                    "paymentMethod",
+                    (e.target.value as PaymentMethod) || undefined,
+                  )
+                }
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 pr-7 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+              >
+                <option value="">Semua Metode</option>
+                {PAYMENT_OPTIONS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+                Dari
+              </label>
+              <input
+                type="date"
+                value={filters.startDate ?? ""}
+                onChange={(e) =>
+                  updateFilter("startDate", e.target.value || undefined)
+                }
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+                Sampai
+              </label>
+              <input
+                type="date"
+                value={filters.endDate ?? ""}
+                onChange={(e) =>
+                  updateFilter("endDate", e.target.value || undefined)
+                }
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+              />
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Filter panel */}
-      {showFilters && (
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-4">
-          {/* Status filter */}
-          <div className="space-y-1.5">
-            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-              Status
-            </p>
-            <div className="flex items-center gap-1 flex-wrap">
-              {STATUS_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.label}
-                  variant={statusFilter === opt.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleStatusChange(opt.value)}
-                  className={cn(
-                    "h-7 text-xs",
-                    statusFilter === opt.value &&
-                      "bg-zinc-950 text-white hover:bg-zinc-800",
-                  )}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Payment method filter */}
-          <div className="space-y-1.5">
-            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-              Metode Bayar
-            </p>
-            <div className="flex items-center gap-1 flex-wrap">
-              {METHOD_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.label}
-                  variant={methodFilter === opt.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleMethodChange(opt.value)}
-                  className={cn(
-                    "h-7 text-xs",
-                    methodFilter === opt.value &&
-                      "bg-zinc-950 text-white hover:bg-zinc-800",
-                  )}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Date range */}
-          <div className="space-y-1.5">
-            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-              Rentang Tanggal
-            </p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  setPage(1);
-                }}
-                className="h-7 text-xs w-36"
-              />
-              <span className="text-xs text-zinc-400">s.d.</span>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
-                  setPage(1);
-                }}
-                className="h-7 text-xs w-36"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Error state */}
-      {error && !isLoading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
-          <AlertTriangle className="size-4 shrink-0" />
-          <span className="font-medium">Gagal memuat data transaksi.</span>
+      {error && (
+        <div className="rounded-sm border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
+          <span className="font-medium">Gagal memuat transaksi.</span>
           <button onClick={refresh} className="underline hover:text-red-900">
             Coba lagi
           </button>
@@ -310,22 +320,19 @@ export default function TransactionsPage() {
       )}
 
       {/* Table */}
-      <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+      <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
                   Tanggal
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Order ID
+                  Order
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
                   Owner
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden lg:table-cell">
-                  Kiosk
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden sm:table-cell">
                   Metode
@@ -333,169 +340,200 @@ export default function TransactionsPage() {
                 <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                   Total
                 </th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                   Status
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {/* Loading skeleton */}
-              {isLoading &&
-                Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i}>
-                    <td className="px-4 py-3">
-                      <Skeleton className="h-3 w-32" />
-                    </td>
-                    <td className="px-4 py-3">
-                      <Skeleton className="h-3 w-24" />
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <Skeleton className="h-3 w-32" />
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      <Skeleton className="h-3 w-20" />
-                    </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
-                      <Skeleton className="h-3 w-12" />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Skeleton className="h-3 w-20 ml-auto" />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Skeleton className="h-5 w-14 rounded-full mx-auto" />
-                    </td>
-                  </tr>
-                ))}
+              {isLoading && transactions.length === 0 && (
+                <>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <Skeleton className="h-3 w-24" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Skeleton className="h-3 w-24" />
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <Skeleton className="h-3 w-32" />
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        <Skeleton className="h-3 w-16" />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Skeleton className="h-3 w-16 ml-auto" />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Skeleton className="h-3 w-16 ml-auto" />
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
 
               {/* Empty state */}
               {!isLoading && transactions.length === 0 && !error && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-16 text-center">
+                  <td colSpan={colSpan} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center">
                         <ReceiptText className="size-4 text-zinc-400" />
                       </div>
                       <p className="text-sm font-medium text-zinc-500">
-                        {hasActiveFilters
-                          ? "Tidak ada transaksi yang cocok"
+                        {activeFilterCount > 0
+                          ? "Tidak ada transaksi yang sesuai dengan filter"
                           : "Belum ada transaksi"}
                       </p>
                       <p className="text-xs text-zinc-400 max-w-xs">
-                        {hasActiveFilters
+                        {activeFilterCount > 0
                           ? "Coba ubah filter atau kata kunci pencarian."
                           : "Transaksi akan muncul saat owner melakukan pembayaran."}
                       </p>
+                      {activeFilterCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearAllFilters}
+                          className="text-xs mt-1"
+                        >
+                          Reset Filter
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
               )}
 
               {/* Data rows */}
-              {!isLoading &&
-                transactions.map((tx) => {
-                  const statusInfo = TX_STATUS_MAP[tx.status];
-                  return (
-                    <tr
-                      key={tx.id}
-                      className="hover:bg-zinc-50/50 transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="text-xs text-zinc-500">
-                          {formatDateTime(tx.createdAt)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-mono text-zinc-700">
-                          {tx.orderId}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <p className="text-xs text-zinc-500 font-mono truncate max-w-[120px]" title={tx.ownerId}>
-                          {tx.ownerId.slice(0, 8)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <p className="text-xs text-zinc-500 font-mono truncate max-w-[120px]" title={tx.kioskId}>
-                          {tx.kioskId.slice(0, 8)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <p className="text-xs text-zinc-500">
-                          {PAYMENT_METHOD_MAP[tx.paymentMethod]}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <p className="text-xs font-medium text-zinc-900 tabular-nums">
-                          {formatRupiah(tx.totalAmount)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge
-                          className={cn("text-[10px]", statusInfo.className)}
-                        >
-                          {statusInfo.label}
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
+              {transactions.map((tx) => {
+                const sc = TX_STATUS_CONFIG[tx.status];
+                return (
+                  <tr
+                    key={tx.id}
+                    className="hover:bg-zinc-50/50 transition-colors"
+                  >
+                    <td className="px-4 py-3 text-xs text-zinc-500 hidden md:table-cell align-top">
+                      {formatDateTime(tx.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <p className="font-mono text-xs text-zinc-600">
+                        {tx.orderId}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell align-top">
+                      <p
+                        className="text-xs text-zinc-500 font-mono"
+                        title={tx.ownerId}
+                      >
+                        {tx.ownerId.slice(0, 8)}…
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-zinc-500 hidden sm:table-cell align-top">
+                      {PAYMENT_METHOD_LABEL[tx.paymentMethod]}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-zinc-900 tabular-nums align-top">
+                      {formatRupiah(tx.totalAmount)}
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
+                      <div
+                        className={cn(
+                          "flex items-center justify-end gap-1.5",
+                          sc.textClass,
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full shrink-0",
+                            sc.dotClass,
+                          )}
+                        />
+                        <span className="text-xs">{sc.label}</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 bg-zinc-50/50">
-            <p className="text-xs text-zinc-400">
-              Hal. {page} dari {totalPages}
-              <span className="hidden sm:inline">
-                {" "}
-                · {meta.total} transaksi
-              </span>
-            </p>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(page - 1)}
-                disabled={page <= 1}
-                className="h-7 w-7 p-0"
-              >
-                <ChevronLeft className="size-3.5" />
-              </Button>
-              {(() => {
-                const pages: number[] = [];
-                let start = Math.max(1, page - 2);
-                const end = Math.min(totalPages, start + 4);
-                start = Math.max(1, end - 4);
-                for (let i = start; i <= end; i++) pages.push(i);
-                return pages.map((p) => (
+        {/* Pagination bar */}
+        {meta &&
+          (totalPages > 1 || filters.limit !== DEFAULT_LIMIT) && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 bg-zinc-50/50">
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-zinc-400">
+                  Hal. {currentPage} dari {Math.max(1, totalPages)}
+                  <span className="hidden sm:inline">
+                    {" "}
+                    · {meta.total} transaksi
+                  </span>
+                </p>
+
+                <select
+                  value={filters.limit}
+                  onChange={(e) => handleLimitChange(Number(e.target.value))}
+                  className="h-6 text-[10px] rounded border border-zinc-200 bg-white px-1.5 pr-5 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                >
+                  {LIMIT_OPTIONS.map((l) => (
+                    <option key={l} value={l}>
+                      {l} / hal
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
                   <Button
-                    key={p}
-                    variant={p === page ? "default" : "outline"}
+                    variant="outline"
                     size="sm"
-                    onClick={() => setPage(p)}
-                    className={cn(
-                      "h-7 w-7 p-0 text-xs",
-                      p === page && "bg-zinc-950 text-white hover:bg-zinc-800",
-                    )}
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                    className="h-7 w-7 p-0"
                   >
-                    {p}
+                    <ChevronLeft className="size-3.5" />
                   </Button>
-                ));
-              })()}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(page + 1)}
-                disabled={page >= totalPages}
-                className="h-7 w-7 p-0"
-              >
-                <ChevronRight className="size-3.5" />
-              </Button>
+
+                  {(() => {
+                    const pages: number[] = [];
+                    let start = Math.max(1, currentPage - 2);
+                    const end = Math.min(totalPages, start + 4);
+                    start = Math.max(1, end - 4);
+                    for (let i = start; i <= end; i++) pages.push(i);
+                    return pages.map((p) => (
+                      <Button
+                        key={p}
+                        variant={p === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => goToPage(p)}
+                        className={cn(
+                          "h-7 w-7 p-0 text-xs",
+                          p === currentPage &&
+                            "bg-zinc-950 text-white hover:bg-zinc-800",
+                        )}
+                      >
+                        {p}
+                      </Button>
+                    ));
+                  })()}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    className="h-7 w-7 p-0"
+                  >
+                    <ChevronRight className="size-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
       </div>
     </div>
   );

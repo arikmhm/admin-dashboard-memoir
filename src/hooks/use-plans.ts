@@ -42,6 +42,7 @@ export function usePlans() {
   return {
     plans,
     isLoading: query.isLoading,
+    isRefetching: query.isRefetching,
     error: query.error as Error | null,
     refresh,
   };

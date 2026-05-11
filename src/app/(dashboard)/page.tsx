@@ -81,7 +81,7 @@ export default function DashboardPage() {
   const statCards: StatCardProps[] = stats
     ? [
         {
-          label: "Studio Owner Aktif",
+          label: "Owner Aktif",
           value: String(stats.activeOwners),
           icon: Users,
           sub: "Owner dengan akun aktif",

@@ -20,7 +20,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -152,7 +151,7 @@ function PlanFormDialog({
           <DialogDescription>
             {isEdit
               ? "Perubahan harga tidak mempengaruhi subscription yang sedang berjalan."
-              : "Buat tier langganan baru untuk studio owner."}
+              : "Buat tier langganan baru untuk owner."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -287,7 +286,7 @@ function PlanFormDialog({
 // ── Plans Page ───────────────────────────────────────────────────────────────
 
 export default function PlansPage() {
-  const { plans, isLoading, error, refresh } = usePlans();
+  const { plans, isLoading, isRefetching, error, refresh } = usePlans();
   const updatePlan = useUpdatePlan();
   const [createOpen, setCreateOpen] = useState(false);
   const [editPlan, setEditPlan] = useState<SubscriptionPlan | null>(null);
@@ -320,28 +319,21 @@ export default function PlansPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-100">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-            Subscription Plans
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Kelola tier langganan platform.
-            {!isLoading && (
-              <span className="text-zinc-400 ml-1">
-                {plans.length} plan terdaftar
-              </span>
-            )}
-          </p>
-        </div>
+      <div className="flex items-center justify-between pb-5 border-b border-zinc-200">
+        <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+          Subscription Plans
+        </h1>
         <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
             onClick={refresh}
+            disabled={isRefetching}
             className="h-8 text-xs gap-1.5"
           >
-            <RefreshCw className={cn("size-3", isLoading && "animate-spin")} />
+            <RefreshCw
+              className={cn("size-3", isRefetching && "animate-spin")}
+            />
           </Button>
           <Button
             size="sm"
@@ -356,7 +348,7 @@ export default function PlansPage() {
 
       {/* Error state */}
       {error && !isLoading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
+        <div className="rounded-sm border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
           <span className="font-medium">Gagal memuat data plan.</span>
           <button onClick={refresh} className="underline hover:text-red-900">
             Coba lagi
@@ -365,7 +357,7 @@ export default function PlansPage() {
       )}
 
       {/* Table */}
-      <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+      <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -382,7 +374,7 @@ export default function PlansPage() {
                 <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
                   Harga Tahunan
                 </th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
@@ -476,17 +468,23 @@ export default function PlansPage() {
                       </span>
                       <span className="text-[10px] text-zinc-400">/thn</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <Badge
+                    <td className="px-4 py-3">
+                      <div
                         className={cn(
-                          "text-[10px]",
-                          plan.isActive
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-zinc-100 text-zinc-500 border-zinc-200",
+                          "flex items-center gap-1.5",
+                          plan.isActive ? "text-emerald-700" : "text-zinc-500",
                         )}
                       >
-                        {plan.isActive ? "Aktif" : "Nonaktif"}
-                      </Badge>
+                        <span
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full shrink-0",
+                            plan.isActive ? "bg-emerald-500" : "bg-zinc-400",
+                          )}
+                        />
+                        <span className="text-xs">
+                          {plan.isActive ? "Aktif" : "Nonaktif"}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">

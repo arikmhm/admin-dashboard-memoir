@@ -1,10 +1,5 @@
 "use client";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// memoir. — Owner Management Page (FEAT-SA-03)
-// Owner list with search, status filter, create modal, row click → detail
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -24,7 +19,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -47,7 +41,7 @@ const PAGE_SIZE = 10;
 type StatusFilter = "all" | "active" | "inactive";
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "Semua" },
+  { value: "all", label: "Semua Status" },
   { value: "active", label: "Aktif" },
   { value: "inactive", label: "Nonaktif" },
 ];
@@ -108,8 +102,8 @@ function CreateOwnerDialog({
         <DialogHeader>
           <DialogTitle>Buat Owner Baru</DialogTitle>
           <DialogDescription>
-            Buat akun studio owner baru. Password sementara harus
-            dikomunikasikan manual.
+            Buat akun owner baru. Password sementara harus dikomunikasikan
+            manual.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -206,12 +200,10 @@ export default function OwnersPage() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Fetch all owners (including deleted for filtering)
-  const { owners, isLoading, error, refresh } = useOwners({
+  const { owners, isLoading, isRefetching, error, refresh } = useOwners({
     includeDeleted: statusFilter !== "active",
   });
 
@@ -220,21 +212,19 @@ export default function OwnersPage() {
   const filteredOwners = useMemo(() => {
     let result = owners;
 
-    // Status filter
     if (statusFilter === "active") {
       result = result.filter((o) => !o.deletedAt);
     } else if (statusFilter === "inactive") {
       result = result.filter((o) => !!o.deletedAt);
     }
 
-    // Search by email
-    if (search) {
-      const q = search.toLowerCase();
+    const q = searchInput.trim().toLowerCase();
+    if (q) {
       result = result.filter((o) => o.email.toLowerCase().includes(q));
     }
 
     return result;
-  }, [owners, statusFilter, search]);
+  }, [owners, statusFilter, searchInput]);
 
   // ── Pagination ───────────────────────────────────────────────────────────
 
@@ -246,21 +236,8 @@ export default function OwnersPage() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  const handleSearch = useCallback(() => {
-    setSearch(searchInput.trim());
-    setPage(1);
-  }, [searchInput]);
-
-  const handleSearchKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") handleSearch();
-    },
-    [handleSearch],
-  );
-
   const clearSearch = useCallback(() => {
     setSearchInput("");
-    setSearch("");
     setPage(1);
   }, []);
 
@@ -274,20 +251,10 @@ export default function OwnersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-100">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-            Studio Owner
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Kelola akun studio owner.
-            {!isLoading && (
-              <span className="text-zinc-400 ml-1">
-                {filteredOwners.length} owner ditemukan
-              </span>
-            )}
-          </p>
-        </div>
+      <div className="flex items-center justify-between pb-5 border-b border-zinc-200">
+        <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+          Owner
+        </h1>
         <Button
           size="sm"
           className="bg-zinc-950 text-white hover:bg-zinc-800 shrink-0"
@@ -300,14 +267,15 @@ export default function OwnersPage() {
 
       {/* Search & Filter Bar */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Search */}
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-400" />
           <Input
             placeholder="Cari email..."
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
+              setPage(1);
+            }}
             className="h-8 pl-9 pr-8 text-xs"
           />
           {searchInput && (
@@ -320,39 +288,34 @@ export default function OwnersPage() {
           )}
         </div>
 
-        {/* Status filter */}
-        <div className="flex items-center gap-1">
+        <select
+          value={statusFilter}
+          onChange={(e) => handleStatusChange(e.target.value as StatusFilter)}
+          className="h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 pr-7 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+        >
           {STATUS_OPTIONS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={statusFilter === opt.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleStatusChange(opt.value)}
-              className={cn(
-                "h-8 text-xs",
-                statusFilter === opt.value &&
-                  "bg-zinc-950 text-white hover:bg-zinc-800",
-              )}
-            >
+            <option key={opt.value} value={opt.value}>
               {opt.label}
-            </Button>
+            </option>
           ))}
-        </div>
+        </select>
 
-        {/* Refresh */}
         <Button
           variant="outline"
           size="sm"
           onClick={refresh}
+          disabled={isRefetching}
           className="h-8 text-xs gap-1.5"
         >
-          <RefreshCw className={cn("size-3", isLoading && "animate-spin")} />
+          <RefreshCw
+            className={cn("size-3", isRefetching && "animate-spin")}
+          />
         </Button>
       </div>
 
       {/* Error state */}
       {error && !isLoading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
+        <div className="rounded-sm border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
           <span className="font-medium">Gagal memuat data owner.</span>
           <button onClick={refresh} className="underline hover:text-red-900">
             Coba lagi
@@ -361,7 +324,7 @@ export default function OwnersPage() {
       )}
 
       {/* Table */}
-      <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+      <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -390,10 +353,7 @@ export default function OwnersPage() {
                         <Skeleton className="h-3 w-28" />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Skeleton className="h-3 w-20 ml-auto" />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Skeleton className="h-5 w-14 rounded-full ml-auto" />
+                        <Skeleton className="h-3 w-16 ml-auto" />
                       </td>
                     </tr>
                   ))}
@@ -403,18 +363,18 @@ export default function OwnersPage() {
               {/* Empty state */}
               {!isLoading && filteredOwners.length === 0 && !error && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-16 text-center">
+                  <td colSpan={3} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center">
                         <Users className="size-4 text-zinc-400" />
                       </div>
                       <p className="text-sm font-medium text-zinc-500">
-                        {search
+                        {searchInput.trim()
                           ? "Tidak ada owner yang cocok"
                           : "Belum ada owner"}
                       </p>
                       <p className="text-xs text-zinc-400 max-w-xs">
-                        {search
+                        {searchInput.trim()
                           ? "Coba ubah kata kunci pencarian."
                           : "Buat owner baru untuk memulai."}
                       </p>
@@ -507,23 +467,27 @@ function OwnerRow({ owner, onClick }: { owner: Owner; onClick: () => void }) {
       onClick={onClick}
       className="hover:bg-zinc-50/50 transition-colors cursor-pointer"
     >
-      <td className="px-4 py-3">
+      <td className="px-4 py-3 align-top">
         <p className="text-sm text-zinc-700">{owner.email}</p>
       </td>
-      <td className="px-4 py-3 hidden md:table-cell">
+      <td className="px-4 py-3 hidden md:table-cell align-top">
         <p className="text-xs text-zinc-500">{formatDate(owner.createdAt)}</p>
       </td>
-      <td className="px-4 py-3 text-right">
-        <Badge
+      <td className="px-4 py-3 text-right align-top">
+        <div
           className={cn(
-            "text-[10px]",
-            isActive
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-              : "bg-zinc-100 text-zinc-500 border-zinc-200",
+            "flex items-center justify-end gap-1.5",
+            isActive ? "text-emerald-700" : "text-zinc-500",
           )}
         >
-          {isActive ? "Aktif" : "Nonaktif"}
-        </Badge>
+          <span
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0",
+              isActive ? "bg-emerald-500" : "bg-zinc-400",
+            )}
+          />
+          <span className="text-xs">{isActive ? "Aktif" : "Nonaktif"}</span>
+        </div>
       </td>
     </tr>
   );

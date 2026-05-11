@@ -8,7 +8,6 @@ import {
   Users,
   CreditCard,
   Settings,
-  ArrowDownToLine,
   ReceiptText,
   ChevronLeft,
   ChevronRight,
@@ -60,7 +59,6 @@ const NAV_ITEMS = [
   { href: "/owners", label: "Studio Owner", icon: Users },
   { href: "/plans", label: "Subscription Plans", icon: CreditCard },
   { href: "/config", label: "Platform Config", icon: Settings },
-  { href: "/withdrawals", label: "Penarikan", icon: ArrowDownToLine },
   { href: "/transactions", label: "Transaksi", icon: ReceiptText },
 ] as const;
 

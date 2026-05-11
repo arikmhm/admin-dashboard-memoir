@@ -18,11 +18,13 @@ const TX_KEY = ["/admin/transactions"] as const;
 // ── Transaction List Hook ────────────────────────────────────────────────────
 
 export interface UseTransactionsOptions {
+  ownerId?: string;
+  kioskId?: string;
   status?: TxStatus;
   paymentMethod?: PaymentMethod;
   startDate?: string; // ISO 8601
   endDate?: string; // ISO 8601
-  search?: string; // orderId or owner email
+  search?: string; // orderId
   page?: number;
   limit?: number;
 }
@@ -36,6 +38,8 @@ export function useTransactions(options?: UseTransactionsOptions) {
     queryKey: [
       ...TX_KEY,
       {
+        ownerId: options?.ownerId,
+        kioskId: options?.kioskId,
         status: options?.status,
         paymentMethod: options?.paymentMethod,
         startDate: options?.startDate,
@@ -47,6 +51,8 @@ export function useTransactions(options?: UseTransactionsOptions) {
     ],
     queryFn: () => {
       const params = new URLSearchParams();
+      if (options?.ownerId) params.set("ownerId", options.ownerId);
+      if (options?.kioskId) params.set("kioskId", options.kioskId);
       if (options?.status) params.set("status", options.status);
       if (options?.paymentMethod)
         params.set("paymentMethod", options.paymentMethod);

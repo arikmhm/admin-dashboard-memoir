@@ -8,7 +8,6 @@
 export type UserRole = "ADMIN" | "OWNER";
 export type TxStatus = "PENDING" | "PAID" | "FAILED" | "EXPIRED";
 export type PaymentMethod = "PG" | "CASH" | "STATIC_QRIS";
-export type WithdrawalStatus = "PENDING" | "PROCESSED" | "REJECTED";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -36,7 +35,6 @@ export interface Owner {
   id: string;
   email: string;
   role: UserRole;
-  walletBalance: number;
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -97,28 +95,6 @@ export interface PlatformConfig {
 
 export interface UpdateConfigRequest {
   value: string;
-}
-
-// ── Withdrawal ───────────────────────────────────────────────────────────────
-
-export interface Withdrawal {
-  id: string;
-  userId: string;
-  amount: number;
-  status: WithdrawalStatus;
-  bankName: string;
-  bankAccountNumber: string;
-  bankAccountName: string;
-  rejectionNote: string | null;
-  processedBy: string | null;
-  processedAt: string | null;
-  walletMutationId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface RejectWithdrawalRequest {
-  rejectionNote: string;
 }
 
 // ── Transaction ──────────────────────────────────────────────────────────────

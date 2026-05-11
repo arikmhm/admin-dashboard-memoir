@@ -35,7 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { formatRupiah, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { useOwners, useCreateOwner } from "@/hooks/use-owners";
 import { ApiError } from "@/lib/api";
 import type { Owner, CreateOwnerRequest } from "@/lib/types";
@@ -147,6 +147,10 @@ function CreateOwnerDialog({
                   minLength: {
                     value: 8,
                     message: "Password minimal 8 karakter",
+                  },
+                  maxLength: {
+                    value: 128,
+                    message: "Password maksimal 128 karakter",
                   },
                 })}
               />
@@ -369,9 +373,6 @@ export default function OwnersPage() {
                   Tgl Daftar
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Saldo Wallet
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                   Status
                 </th>
               </tr>
@@ -511,11 +512,6 @@ function OwnerRow({ owner, onClick }: { owner: Owner; onClick: () => void }) {
       </td>
       <td className="px-4 py-3 hidden md:table-cell">
         <p className="text-xs text-zinc-500">{formatDate(owner.createdAt)}</p>
-      </td>
-      <td className="px-4 py-3 text-right">
-        <p className="text-sm font-medium text-zinc-900 tabular-nums">
-          {formatRupiah(owner.walletBalance)}
-        </p>
       </td>
       <td className="px-4 py-3 text-right">
         <Badge

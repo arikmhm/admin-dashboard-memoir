@@ -7,7 +7,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useAdminDashboard } from "@/hooks/use-admin-dashboard";
-import { formatRupiah } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,8 +14,6 @@ import {
   Users,
   UserX,
   ReceiptText,
-  ArrowDownToLine,
-  Wallet,
   RefreshCw,
   XCircle,
 } from "lucide-react";
@@ -119,20 +116,6 @@ export default function DashboardPage() {
           sub: currentDate,
           accent: "default",
         },
-        {
-          label: "Withdrawal Pending",
-          value: String(stats.pendingWithdrawals),
-          icon: ArrowDownToLine,
-          sub: "Menunggu diproses",
-          accent: stats.pendingWithdrawals > 0 ? "yellow" : "default",
-        },
-        {
-          label: "Total Saldo Platform",
-          value: formatRupiah(stats.totalPlatformBalance),
-          icon: Wallet,
-          sub: "Agregat wallet seluruh owner",
-          accent: "default",
-        },
       ]
     : [];
 
@@ -187,9 +170,9 @@ export default function DashboardPage() {
       )}
 
       {/* ── Stat cards ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {isLoading
-          ? Array.from({ length: 5 }).map((_, i) => (
+          ? Array.from({ length: 3 }).map((_, i) => (
               <StatCardSkeleton key={i} />
             ))
           : statCards.map((stat) => <StatCard key={stat.label} {...stat} />)}

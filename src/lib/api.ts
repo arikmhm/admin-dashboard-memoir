@@ -37,27 +37,26 @@ export class ApiError extends Error {
   }
 }
 
-// ── Token management ─────────────────────────────────────────────────────────
+// ── Token management (in-memory) ─────────────────────────────────────────────
 
-const TOKEN_KEY = "memoir_admin_token";
+let accessToken: string | null = null;
 
 export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return accessToken;
 }
 
 export function setToken(token: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(TOKEN_KEY, token);
-  // Sync to cookie for middleware access (optimistic edge-level check)
-  document.cookie = `${TOKEN_KEY}=${token};path=/;max-age=${60 * 60 * 24 * 30};SameSite=Lax`;
+  accessToken = token;
 }
 
+/** Event name dispatched when token is forcibly removed (e.g. 401 + refresh fail). */
+export const TOKEN_REMOVED_EVENT = "memoir:token-removed";
+
 export function removeToken(): void {
+  accessToken = null;
   if (typeof window === "undefined") return;
-  localStorage.removeItem(TOKEN_KEY);
-  // Clear cookie
-  document.cookie = `${TOKEN_KEY}=;path=/;max-age=0`;
+  // Notify AuthProvider so it can clear React state
+  window.dispatchEvent(new Event(TOKEN_REMOVED_EVENT));
 }
 
 // ── Token refresh ────────────────────────────────────────────────────────────
@@ -68,7 +67,7 @@ let refreshPromise: Promise<string | null> | null = null;
  * Attempt to refresh the access token using the HttpOnly refresh_token cookie.
  * Uses a shared promise to prevent concurrent refresh requests.
  */
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: "POST",
@@ -116,7 +115,11 @@ async function apiFetch<T>(
 
   // Handle 401 → try token refresh, then retry once
   if (res.status === 401) {
-    if (!_isRetry) {
+    // Auth endpoints: 401 means invalid credentials, not an expired session.
+    // Skip token refresh and let the caller handle the error.
+    const isAuthEndpoint = endpoint.startsWith("/auth/");
+
+    if (!isAuthEndpoint && !_isRetry) {
       // Use shared promise to deduplicate concurrent refreshes
       if (!refreshPromise) {
         refreshPromise = refreshAccessToken().finally(() => {
@@ -132,15 +135,28 @@ async function apiFetch<T>(
       }
     }
 
-    // Refresh failed or already a retry → clear and redirect
-    removeToken();
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
+    if (!isAuthEndpoint) {
+      // Refresh failed or already a retry → clear token.
+      // AuthProvider listens for TOKEN_REMOVED_EVENT and handles
+      // the SPA redirect to /login (no white-screen full reload).
+      removeToken();
     }
+
+    // Parse actual backend error response instead of hardcoding
+    let errorData: ApiErrorResponse;
+    try {
+      errorData = await res.json();
+    } catch {
+      errorData = {
+        error: "UNAUTHORIZED",
+        message: "Sesi berakhir, silakan login kembali",
+      };
+    }
+
     throw new ApiError(
-      401,
-      "UNAUTHORIZED",
-      "Sesi berakhir, silakan login kembali",
+      res.status,
+      errorData.error ?? "UNAUTHORIZED",
+      errorData.message ?? "Sesi berakhir, silakan login kembali",
     );
   }
 

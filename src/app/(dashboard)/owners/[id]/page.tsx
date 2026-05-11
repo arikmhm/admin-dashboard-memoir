@@ -7,13 +7,11 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowLeft,
   Mail,
   Calendar,
-  Wallet,
   ShieldAlert,
   ShieldCheck,
   RefreshCw,
@@ -35,9 +33,8 @@ import {
 import { cn } from "@/lib/utils";
 import { formatRupiah, formatDate, formatDateTime } from "@/lib/format";
 import { useOwnerDetail, useUpdateOwner } from "@/hooks/use-owners";
-import { api } from "@/lib/api";
-import type { ApiPaginatedResponse } from "@/lib/api";
-import type { Transaction, TxStatus, PaymentMethod } from "@/lib/types";
+import { useTransactions } from "@/hooks/use-transactions";
+import type { TxStatus, PaymentMethod } from "@/lib/types";
 
 // ── Status / Payment helpers ─────────────────────────────────────────────────
 
@@ -70,25 +67,18 @@ const PAYMENT_METHOD_MAP: Record<PaymentMethod, string> = {
 
 function OwnerDetailContent({ id }: { id: string }) {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { owner, isLoading, error } = useOwnerDetail(id);
+  const { owner, isLoading, error, refresh: refreshOwner } = useOwnerDetail(id);
   const updateOwner = useUpdateOwner();
   const [confirmDialog, setConfirmDialog] = useState<
     "deactivate" | "restore" | null
   >(null);
 
   // Fetch recent transactions for this owner
-  const txQuery = useQuery({
-    queryKey: ["/admin/transactions", { ownerId: id }],
-    queryFn: () =>
-      api.get<ApiPaginatedResponse<Transaction>>(
-        `/admin/transactions?ownerId=${id}&limit=10`,
-      ),
-    enabled: !!id,
-    staleTime: 30_000,
-  });
-
-  const transactions = txQuery.data?.data ?? [];
+  const {
+    transactions,
+    isLoading: txLoading,
+    refresh: refreshTx,
+  } = useTransactions({ ownerId: id, limit: 10 });
 
   const handleToggleActive = async () => {
     if (!owner) return;
@@ -99,7 +89,7 @@ function OwnerDetailContent({ id }: { id: string }) {
         id: owner.id,
         isActive: !isDeactivating,
       });
-      queryClient.invalidateQueries({ queryKey: ["/admin/owners", id] });
+      refreshOwner();
       toast.success(
         isDeactivating ? "Owner dinonaktifkan" : "Owner diaktifkan kembali",
       );
@@ -112,10 +102,8 @@ function OwnerDetailContent({ id }: { id: string }) {
   };
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["/admin/owners", id] });
-    queryClient.invalidateQueries({
-      queryKey: ["/admin/transactions", { ownerId: id }],
-    });
+    refreshOwner();
+    refreshTx();
   };
 
   // ── Loading state ────────────────────────────────────────────────────────
@@ -237,7 +225,7 @@ function OwnerDetailContent({ id }: { id: string }) {
             <RefreshCw
               className={cn(
                 "size-3",
-                (isLoading || txQuery.isLoading) && "animate-spin",
+                (isLoading || txLoading) && "animate-spin",
               )}
             />
           </Button>
@@ -266,18 +254,12 @@ function OwnerDetailContent({ id }: { id: string }) {
       </div>
 
       {/* Info Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <InfoCard icon={Mail} label="Email" value={owner.email} />
         <InfoCard
           icon={Calendar}
           label="Tanggal Daftar"
           value={formatDate(owner.createdAt)}
-        />
-        <InfoCard
-          icon={Wallet}
-          label="Saldo Wallet"
-          value={formatRupiah(owner.walletBalance)}
-          highlight
         />
       </div>
 
@@ -291,7 +273,7 @@ function OwnerDetailContent({ id }: { id: string }) {
           <span className="text-xs text-zinc-400">Menampilkan 10 terbaru</span>
         </div>
 
-        {txQuery.isLoading && (
+        {txLoading && (
           <div className="divide-y divide-zinc-100">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 px-4 py-3">
@@ -304,14 +286,14 @@ function OwnerDetailContent({ id }: { id: string }) {
           </div>
         )}
 
-        {!txQuery.isLoading && transactions.length === 0 && (
+        {!txLoading && transactions.length === 0 && (
           <div className="px-4 py-12 text-center">
             <ReceiptText className="size-6 text-zinc-300 mx-auto mb-2" />
             <p className="text-sm text-zinc-400">Belum ada transaksi</p>
           </div>
         )}
 
-        {!txQuery.isLoading && transactions.length > 0 && (
+        {!txLoading && transactions.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

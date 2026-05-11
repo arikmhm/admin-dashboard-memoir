@@ -15,10 +15,6 @@ import type { Owner, CreateOwnerRequest } from "@/lib/types";
 
 const OWNERS_KEY = ["/admin/owners"] as const;
 
-function ownerDetailKey(id: string) {
-  return ["/admin/owners", id] as const;
-}
-
 // ── Owner List Hook ──────────────────────────────────────────────────────────
 
 interface UseOwnersOptions {
@@ -51,6 +47,38 @@ export function useOwners(options?: UseOwnersOptions) {
   };
 }
 
+// ── Owner Detail Hook (derived from list endpoint) ──────────────────────────
+
+/**
+ * Fetches a single owner by ID using GET /admin/owners?includeDeleted=true
+ * and selecting the matching owner from the list. Shares cache with useOwners.
+ */
+export function useOwnerDetail(id: string) {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: [...OWNERS_KEY, { includeDeleted: true }],
+    queryFn: () =>
+      api.get<ApiSuccessResponse<Owner[]>>(
+        "/admin/owners?includeDeleted=true",
+      ),
+    staleTime: 60_000,
+    enabled: !!id,
+    select: (data) => data.data.find((o) => o.id === id) ?? null,
+  });
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: OWNERS_KEY });
+  };
+
+  return {
+    owner: query.data ?? null,
+    isLoading: query.isLoading,
+    error: query.error as Error | null,
+    refresh,
+  };
+}
+
 // ── Create Owner Mutation ────────────────────────────────────────────────────
 
 export function useCreateOwner() {
@@ -58,7 +86,7 @@ export function useCreateOwner() {
 
   return useMutation({
     mutationFn: (data: CreateOwnerRequest) =>
-      api.post<ApiSuccessResponse<Owner>>("/admin/owners", data),
+      api.post<ApiSuccessResponse<Pick<Owner, "id" | "email" | "role" | "createdAt">>>("/admin/owners", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: OWNERS_KEY });
     },
@@ -83,21 +111,4 @@ export function useUpdateOwner() {
       queryClient.invalidateQueries({ queryKey: OWNERS_KEY });
     },
   });
-}
-
-// ── Owner Detail Hook ────────────────────────────────────────────────────────
-
-export function useOwnerDetail(id: string) {
-  const query = useQuery({
-    queryKey: ownerDetailKey(id),
-    queryFn: () => api.get<ApiSuccessResponse<Owner>>(`/admin/owners/${id}`),
-    enabled: !!id,
-    staleTime: 30_000,
-  });
-
-  return {
-    owner: query.data?.data ?? null,
-    isLoading: query.isLoading,
-    error: query.error as Error | null,
-  };
 }

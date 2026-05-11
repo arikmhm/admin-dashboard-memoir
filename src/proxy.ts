@@ -5,39 +5,34 @@
 // Next.js 16+ uses "proxy" instead of "middleware".
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-const TOKEN_COOKIE = "memoir_admin_token";
-
-/** Routes that don't require authentication */
 const PUBLIC_ROUTES = ["/login"];
 
-function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`),
-  );
-}
-
-export function proxy(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasToken = request.cookies.has(TOKEN_COOKIE);
+  const hasSession = request.cookies.has("refresh_token");
+  const isPublic = PUBLIC_ROUTES.some(
+    (r) => pathname === r || pathname.startsWith(`${r}/`),
+  );
 
   // Unauthenticated user trying to access protected route → redirect to /login
-  if (!hasToken && !isPublicRoute(pathname)) {
-    const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
+  if (!hasSession && !isPublic) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   // Authenticated user trying to access login → redirect to dashboard
-  if (hasToken && isPublicRoute(pathname)) {
-    const dashboardUrl = new URL("/", request.url);
-    return NextResponse.redirect(dashboardUrl);
+  if (hasSession && isPublic) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();
 }
 
-// Only run middleware on app routes (skip API proxy, static assets, images)
+// Only run proxy on app routes (skip API proxy, static assets, images)
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|.*\\.png$|.*\\.ico$).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon\\.ico|sitemap\\.xml|robots\\.txt).*)",
+  ],
 };

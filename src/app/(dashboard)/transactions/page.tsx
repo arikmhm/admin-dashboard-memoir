@@ -62,6 +62,7 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "PAID", label: "Lunas" },
   { value: "PENDING", label: "Pending" },
   { value: "FAILED", label: "Gagal" },
+  { value: "EXPIRED", label: "Kedaluwarsa" },
 ];
 
 const METHOD_OPTIONS: { value: MethodFilter; label: string }[] = [
@@ -409,13 +410,13 @@ export default function TransactionsPage() {
                         </p>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <p className="text-xs text-zinc-700">
-                          {tx.owner?.email ?? "—"}
+                        <p className="text-xs text-zinc-500 font-mono truncate max-w-[120px]" title={tx.ownerId}>
+                          {tx.ownerId.slice(0, 8)}
                         </p>
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
-                        <p className="text-xs text-zinc-500">
-                          {tx.kiosk?.name ?? "—"}
+                        <p className="text-xs text-zinc-500 font-mono truncate max-w-[120px]" title={tx.kioskId}>
+                          {tx.kioskId.slice(0, 8)}
                         </p>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">

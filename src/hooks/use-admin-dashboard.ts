@@ -25,6 +25,7 @@ export interface AdminDashboardStats {
 interface UseAdminDashboardReturn {
   stats: AdminDashboardStats | null;
   isLoading: boolean;
+  isRefetching: boolean;
   error: Error | null;
   refresh: () => void;
 }
@@ -72,6 +73,8 @@ export function useAdminDashboard(): UseAdminDashboardReturn {
   });
 
   const isLoading = ownersQuery.isLoading || transactionsQuery.isLoading;
+  const isRefetching =
+    ownersQuery.isRefetching || transactionsQuery.isRefetching;
 
   const error =
     (ownersQuery.error as Error | null) ??
@@ -100,5 +103,5 @@ export function useAdminDashboard(): UseAdminDashboardReturn {
     });
   };
 
-  return { stats, isLoading, error, refresh };
+  return { stats, isLoading, isRefetching, error, refresh };
 }

@@ -12,7 +12,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "memoir. | Admin Dashboard",
+  title: {
+    template: "memoir. | %s",
+    default: "memoir. | ADMIN",
+  },
   description: "Platform admin management dashboard untuk memoir.",
 };
 
